@@ -39,8 +39,9 @@ func ExerciseReachability(l *Laboratory, at time.Time) map[string]any {
     result["observed_occupancy"] = auxiliaryTank.Snapshot()
     auxiliaryTracks := track.NewCoordinator(auxiliaryTank)
     result["lease_description"] = track.LeaseDescription(track.Lease{Section: occupancy.Section, Run: occupancy.Run, Carriage: occupancy.Carriage, Fence: occupancy.Fence, LeaseID: occupancy.Lease, AcquiredAt: at})
-    result["release_with_fence"] = auxiliaryTracks.ReleaseWithFence(identities.Run, occupancy.Fence)
-    auxiliaryTank.Release("audit", identities.Run, occupancy.Fence)
+    _, releasedWithFence := auxiliaryTracks.ReleaseWithFence(identities.Run, occupancy.Fence, at)
+    result["release_with_fence"] = releasedWithFence
+    _, _ = auxiliaryTank.Release("audit", identities.Run, occupancy.Fence, at)
 
     sectionState := l.Sections.UpdateDepth("section-b", 2.5)
     _, sectionFound := l.Sections.Get("section-b")
@@ -86,6 +87,37 @@ func ExerciseReachability(l *Laboratory, at time.Time) map[string]any {
     brakeCoordinator := carriage.NewBrakeCoordinator(brakeController, brakeTracks)
     result["brake_hold"] = brakeCoordinator.Hold(identities.Run)
     result["brake_release"] = brakeCoordinator.BrakeAndRelease(identities.Run, brakeCommand.ID, brakeCommand.Epoch, at) == nil
+
+    queueTank := tank.NewRegistry(2.3)
+    queueTracks := track.NewCoordinator(queueTank)
+    queueStartup := testpkg.Startup{Tests: testpkg.NewRegistry(), Tracks: queueTracks, Carriage: carriage.NewController()}
+    holder := model.NewOperation("queue-holder", "model", "queue-section", "carriage-1", at)
+    holderAcquisition, _ := queueStartup.ArmQueued(holder, holder.Section, time.Minute, at)
+    result["queue_holder_granted"] = holderAcquisition.Granted
+    stale := model.NewOperation("queue-stale", "model", "queue-section", "carriage-3", at)
+    staleAcquisition, _ := queueStartup.ArmQueued(stale, stale.Section, time.Millisecond, at)
+    result["queue_stale_queued"] = !staleAcquisition.Granted
+    waiter := model.NewOperation("queue-waiter", "model", "queue-section", "carriage-2", at)
+    waiterAcquisition, _ := queueStartup.ArmQueued(waiter, waiter.Section, time.Minute, at)
+    result["queue_waiter_position"] = waiterAcquisition.Position
+    withdrawn := model.NewOperation("queue-withdrawn", "model", "queue-section", "carriage-4", at)
+    withdrawnAcquisition, _ := queueStartup.ArmQueued(withdrawn, withdrawn.Section, time.Minute, at)
+    _, withdrawOK := queueTracks.Withdraw(withdrawn.ID, withdrawn.Section, withdrawn.Carriage)
+    result["queue_withdrawn"] = !withdrawnAcquisition.Granted && withdrawOK
+    handoffAt := at.Add(2 * time.Millisecond)
+    handoffOutcome, handoffErr := queueTracks.Release(holder.ID, handoffAt)
+    result["queue_release_error"] = errorText(handoffErr)
+    result["queue_handoff_run"] = handoffOutcome.Lease.Run
+    result["queue_handoff_carriage"] = handoffOutcome.Lease.Carriage
+    result["queue_handoff_expired"] = handoffOutcome.Expired
+    result["queue_pending"] = queueTracks.Pending("queue-section")
+    late := model.NewOperation("queue-late", "model", "queue-section", "carriage-5", handoffAt)
+    lateAcquisition, _ := queueStartup.ArmQueued(late, late.Section, time.Millisecond, handoffAt)
+    result["queue_late_queued"] = !lateAcquisition.Granted
+    finalOutcome, _ := queueTracks.Release(waiter.ID, handoffAt.Add(2*time.Millisecond))
+    result["queue_final_handed"] = finalOutcome.Handed
+    result["queue_final_expired"] = finalOutcome.Expired
+    result["queue_section_free"] = queueTank.ObserveFree("queue-section")
 
     forceReceiver := force.NewReceiver()
     result["force_persist"] = force.Persist(forceReceiver, l.Store, identities.Run, identities.Revision, 3.5, at) == nil
@@ -150,7 +182,7 @@ func ExerciseReachability(l *Laboratory, at time.Time) map[string]any {
     launched, launchErr := startup.Launch(operation, operation.Section, at)
     result["startup_launch"] = launched
     result["startup_launch_error"] = errorText(launchErr)
-    result["startup_release"] = startup.Release(operation) == nil
+    result["startup_release"] = startup.Release(operation, at) == nil
     result["can_remove_model"] = testpkg.CanRemoveModel(l.Store.Records(), identities.Run)
     result["evidence_count"] = testpkg.EvidenceCount(l.Store.Records(), identities.Run)
 
