@@ -11,6 +11,7 @@ type RunID string
 type RevisionID string
 type EventID string
 type LeaseID string
+type TicketID string
 
 type IdentitySet struct {
     Run RunID `json:"run"`
@@ -33,6 +34,10 @@ func NewEventID() EventID {
 
 func NewLeaseID() LeaseID {
     return LeaseID(uuid.NewString())
+}
+
+func NewTicketID() TicketID {
+    return TicketID(uuid.NewString())
 }
 
 func NewIdentitySet() IdentitySet {

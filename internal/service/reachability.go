@@ -39,8 +39,8 @@ func ExerciseReachability(l *Laboratory, at time.Time) map[string]any {
     result["observed_occupancy"] = auxiliaryTank.Snapshot()
     auxiliaryTracks := track.NewCoordinator(auxiliaryTank)
     result["lease_description"] = track.LeaseDescription(track.Lease{Section: occupancy.Section, Run: occupancy.Run, Carriage: occupancy.Carriage, Fence: occupancy.Fence, LeaseID: occupancy.Lease, AcquiredAt: at})
-    result["release_with_fence"] = auxiliaryTracks.ReleaseWithFence(identities.Run, occupancy.Fence)
-    auxiliaryTank.Release("audit", identities.Run, occupancy.Fence)
+    result["release_with_fence"] = auxiliaryTracks.ReleaseWithFence(identities.Run, occupancy.Fence, at)
+    auxiliaryTank.Release("audit", identities.Run, occupancy.Fence, at)
 
     sectionState := l.Sections.UpdateDepth("section-b", 2.5)
     _, sectionFound := l.Sections.Get("section-b")
@@ -150,7 +150,7 @@ func ExerciseReachability(l *Laboratory, at time.Time) map[string]any {
     launched, launchErr := startup.Launch(operation, operation.Section, at)
     result["startup_launch"] = launched
     result["startup_launch_error"] = errorText(launchErr)
-    result["startup_release"] = startup.Release(operation) == nil
+    result["startup_release"] = startup.Release(operation, at) == nil
     result["can_remove_model"] = testpkg.CanRemoveModel(l.Store.Records(), identities.Run)
     result["evidence_count"] = testpkg.EvidenceCount(l.Store.Records(), identities.Run)
 

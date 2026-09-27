@@ -138,7 +138,7 @@ func (l *Laboratory) Exercise(at time.Time) map[string]any {
     }
     emergencyResult := l.Emergency.Execute(operation.ID, command.ID, command.Epoch, brakeErr, at.Add(7*time.Millisecond))
     l.TrackState.Clear(operation.ID, lease.Fence)
-    _ = l.Tracks.Release(operation.ID)
+    _ = l.Tracks.Release(operation.ID, at.Add(7*time.Millisecond))
     records := l.Store.Records()
     snapshot, snapshotErr := l.Snapshots.SaveRecords(records, at.Add(8*time.Millisecond))
     scenario := StandardScenario(operation.ID, operation.Revision, at)

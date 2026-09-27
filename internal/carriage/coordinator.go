@@ -25,7 +25,7 @@ func (b *BrakeCoordinator) BrakeAndRelease(run model.RunID, commandID string, ep
     if !receipt.Confirmed || receipt.Velocity != 0 || !b.Controller.Stopped(run, commandID, epoch) {
         return errors.New("brake proof incomplete")
     }
-    return b.Track.Release(run)
+    return b.Track.Release(run, at)
 }
 
 func (b *BrakeCoordinator) Hold(run model.RunID) bool {

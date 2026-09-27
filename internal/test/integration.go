@@ -27,6 +27,6 @@ func (s Startup) Launch(operation model.Operation, section string, at time.Time)
     return s.Carriage.Accelerate(operation.ID, lease.Fence, lease.Fence, 1.2, at), nil
 }
 
-func (s Startup) Release(operation model.Operation) error {
-    return s.Tracks.Release(operation.ID)
+func (s Startup) Release(operation model.Operation, at time.Time) error {
+    return s.Tracks.Release(operation.ID, at)
 }
